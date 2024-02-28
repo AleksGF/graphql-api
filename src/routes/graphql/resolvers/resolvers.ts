@@ -12,7 +12,16 @@ type IdArgs = {
 export const usersResolver = async (context) => {
   const { prisma } = context as Context;
 
-  return await prisma.user.findMany();
+  return await prisma.user.findMany({
+    include: {
+      profile: {
+        include: {
+          memberType: true,
+        },
+      },
+      posts: true,
+    },
+  });
 };
 
 export const userByIdResolver = async (args, context) => {
@@ -21,6 +30,14 @@ export const userByIdResolver = async (args, context) => {
 
   const user = await prisma.user.findUnique({
     where: { id },
+    include: {
+      profile: {
+        include: {
+          memberType: true,
+        },
+      },
+      posts: true,
+    },
   });
 
   return user;
@@ -72,17 +89,6 @@ export const profileByIdResolver = async (args, context) => {
 
   const profile = await prisma.profile.findUnique({
     where: { id },
-  });
-
-  return profile;
-};
-
-export const profileByUserResolver = async (user, context) => {
-  const { id } = user as IdArgs;
-  const { prisma } = context as Context;
-
-  const profile = await prisma.profile.findUnique({
-    where: { userId: id },
   });
 
   return profile;

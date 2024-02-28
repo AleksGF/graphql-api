@@ -13,7 +13,6 @@ import {
   postByIdResolver,
   postsResolver,
   profileByIdResolver,
-  profileByUserResolver,
   profilesResolver,
   userByIdResolver,
   usersResolver,
@@ -48,6 +47,7 @@ const Profile = new GraphQLObjectType({
     yearOfBirth: { type: GraphQLInt },
     userId: { type: UUIDType },
     memberTypeId: { type: MemberTypeId },
+    memberType: { type: MemberType },
   },
 });
 
@@ -59,8 +59,8 @@ const User = new GraphQLObjectType({
     balance: { type: GraphQLFloat },
     profile: {
       type: Profile,
-      resolve: (user, _args, context) => profileByUserResolver(user, context),
     },
+    posts: { type: new GraphQLList(Post) },
   },
 });
 
