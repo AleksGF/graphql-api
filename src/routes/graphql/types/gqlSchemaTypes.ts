@@ -1,8 +1,6 @@
 import {
   GraphQLBoolean,
-  GraphQLEnumType,
   GraphQLFloat,
-  GraphQLID,
   GraphQLInt,
   GraphQLList,
   GraphQLNonNull,
@@ -15,42 +13,28 @@ import {
   postByIdResolver,
   postsResolver,
   profileByIdResolver,
+  profileByUserResolver,
   profilesResolver,
   userByIdResolver,
   usersResolver,
 } from '../resolvers/resolvers.js';
-
-const User = new GraphQLObjectType({
-  name: 'User',
-  fields: {
-    id: { type: GraphQLID },
-    name: { type: GraphQLString },
-    balance: { type: GraphQLFloat },
-  },
-});
+import { MemberTypeId } from './memberTypeId.js';
+import { UUIDType } from './uuid.js';
 
 const Post = new GraphQLObjectType({
   name: 'Post',
   fields: {
-    id: { type: GraphQLID },
+    id: { type: UUIDType },
     title: { type: GraphQLString },
     content: { type: GraphQLString },
-    authorId: { type: GraphQLID },
-  },
-});
-
-const MemberTypesIdEnum = new GraphQLEnumType({
-  name: 'MemberTypeId',
-  values: {
-    BASIC: { value: 'basic' },
-    BUSINESS: { value: 'business' },
+    authorId: { type: UUIDType },
   },
 });
 
 const MemberType = new GraphQLObjectType({
   name: 'MemberType',
   fields: {
-    id: { type: MemberTypesIdEnum },
+    id: { type: MemberTypeId },
     discount: { type: GraphQLFloat },
     postsLimitPerMonth: { type: GraphQLInt },
   },
@@ -59,11 +43,24 @@ const MemberType = new GraphQLObjectType({
 const Profile = new GraphQLObjectType({
   name: 'Profile',
   fields: {
-    id: { type: GraphQLString },
+    id: { type: UUIDType },
     isMale: { type: GraphQLBoolean },
     yearOfBirth: { type: GraphQLInt },
-    userId: { type: GraphQLID },
-    memberTypeId: { type: GraphQLString },
+    userId: { type: UUIDType },
+    memberTypeId: { type: MemberTypeId },
+  },
+});
+
+const User = new GraphQLObjectType({
+  name: 'User',
+  fields: {
+    id: { type: UUIDType },
+    name: { type: GraphQLString },
+    balance: { type: GraphQLFloat },
+    profile: {
+      type: Profile,
+      resolve: (user, _args, context) => profileByUserResolver(user, context),
+    },
   },
 });
 
@@ -79,7 +76,7 @@ export const QueryType = new GraphQLObjectType({
     user: {
       type: User,
       args: {
-        id: { type: new GraphQLNonNull(GraphQLID) },
+        id: { type: new GraphQLNonNull(UUIDType) },
       },
       resolve: (_parent, args, context) => userByIdResolver(args, context),
     },
@@ -90,7 +87,7 @@ export const QueryType = new GraphQLObjectType({
     post: {
       type: Post,
       args: {
-        id: { type: new GraphQLNonNull(GraphQLID) },
+        id: { type: new GraphQLNonNull(UUIDType) },
       },
       resolve: (_parent, args, context) => postByIdResolver(args, context),
     },
@@ -101,7 +98,7 @@ export const QueryType = new GraphQLObjectType({
     memberType: {
       type: MemberType,
       args: {
-        id: { type: new GraphQLNonNull(GraphQLID) },
+        id: { type: new GraphQLNonNull(MemberTypeId) },
       },
       resolve: (_parent, args, context) => memberTypeByIdResolver(args, context),
     },
@@ -112,7 +109,7 @@ export const QueryType = new GraphQLObjectType({
     profile: {
       type: Profile,
       args: {
-        id: { type: new GraphQLNonNull(GraphQLID) },
+        id: { type: new GraphQLNonNull(UUIDType) },
       },
       resolve: (_parent, args, context) => profileByIdResolver(args, context),
     },
