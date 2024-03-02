@@ -87,6 +87,9 @@ export enum ResolverActions {
   CREATE_USER = 'createUser',
   CREATE_POST = 'createPost',
   CREATE_PROFILE = 'createProfile',
+  DELETE_USER = 'deleteUser',
+  DELETE_POST = 'deletePost',
+  DELETE_PROFILE = 'deleteProfile',
 }
 
 const getUserInclude = () => ({
@@ -265,6 +268,24 @@ const createUserResolver = async (
   return await addSubsToUser(user, requestInfo);
 };
 
+const deleteUserResolver = async (prisma: Prisma, args: unknown) => {
+  const { id } = args as IdArgs;
+
+  try {
+    await prisma.user.delete({
+      where: {
+        id,
+      },
+    });
+
+    userDataLoader.clear(id);
+
+    return true;
+  } catch (error) {
+    return false;
+  }
+};
+
 const postsResolver = async (prisma: Prisma) => {
   const posts = await prisma.post.findMany();
 
@@ -295,6 +316,24 @@ const createPostResolver = async (prisma: Prisma, args: unknown) => {
   postDataLoader.prime(newPost.id, newPost);
 
   return await postDataLoader.load(newPost.id);
+};
+
+const deletePostResolver = async (prisma: Prisma, args: unknown) => {
+  const { id } = args as IdArgs;
+
+  try {
+    await prisma.post.delete({
+      where: {
+        id,
+      },
+    });
+
+    postDataLoader.clear(id);
+
+    return true;
+  } catch (error) {
+    return false;
+  }
 };
 
 const profilesResolver = async (prisma: Prisma) => {
@@ -328,6 +367,24 @@ const createProfileResolver = async (prisma: Prisma, args: unknown) => {
   profileDataLoader.prime(newProfile.id, newProfile);
 
   return await profileDataLoader.load(newProfile.id);
+};
+
+const deleteProfileResolver = async (prisma: Prisma, args: unknown) => {
+  const { id } = args as IdArgs;
+
+  try {
+    await prisma.profile.delete({
+      where: {
+        id,
+      },
+    });
+
+    profileDataLoader.clear(id);
+
+    return true;
+  } catch (error) {
+    return false;
+  }
 };
 
 const memberTypesResolver = async (prisma: Prisma) => {
@@ -403,5 +460,14 @@ export const getDataResolver = (
 
     case ResolverActions.CREATE_PROFILE:
       return createProfileResolver(prisma, args);
+
+    case ResolverActions.DELETE_USER:
+      return deleteUserResolver(prisma, args);
+
+    case ResolverActions.DELETE_POST:
+      return deletePostResolver(prisma, args);
+
+    case ResolverActions.DELETE_PROFILE:
+      return deleteProfileResolver(prisma, args);
   }
 };

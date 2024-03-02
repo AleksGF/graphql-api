@@ -188,5 +188,32 @@ export const MutationType = new GraphQLObjectType({
       resolve: (_parent, args, context) =>
         getDataResolver(ResolverActions.CREATE_PROFILE, context, args),
     },
+
+    deleteUser: {
+      type: GraphQLBoolean,
+      args: {
+        id: { type: new GraphQLNonNull(UUIDType) },
+      },
+      resolve: (_parent, args, context) =>
+        getDataResolver(ResolverActions.DELETE_USER, context, args),
+    },
+
+    deletePost: {
+      type: GraphQLBoolean,
+      args: {
+        id: { type: new GraphQLNonNull(UUIDType) },
+      },
+      resolve: (_parent, args, context) =>
+        getDataResolver(ResolverActions.DELETE_POST, context, args),
+    },
+
+    deleteProfile: {
+      type: GraphQLBoolean,
+      args: {
+        id: { type: new GraphQLNonNull(UUIDType) },
+      },
+      resolve: (_parent, args, context) =>
+        getDataResolver(ResolverActions.DELETE_PROFILE, context, args),
+    },
   },
 });
