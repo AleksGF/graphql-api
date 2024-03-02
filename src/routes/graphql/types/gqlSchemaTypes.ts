@@ -1,6 +1,7 @@
 import {
   GraphQLBoolean,
   GraphQLFloat,
+  GraphQLInputObjectType,
   GraphQLInt,
   GraphQLList,
   GraphQLNonNull,
@@ -57,7 +58,42 @@ const User = new GraphQLObjectType({
   }),
 });
 
-export const Types = [User, Post, MemberType, Profile];
+const CreateUserInputType = new GraphQLInputObjectType({
+  name: 'CreateUserInput',
+  fields: () => ({
+    name: { type: new GraphQLNonNull(GraphQLString) },
+    balance: { type: new GraphQLNonNull(GraphQLFloat) },
+  }),
+});
+
+const CreatePostInputType = new GraphQLInputObjectType({
+  name: 'CreatePostInput',
+  fields: () => ({
+    title: { type: new GraphQLNonNull(GraphQLString) },
+    content: { type: new GraphQLNonNull(GraphQLString) },
+    authorId: { type: new GraphQLNonNull(UUIDType) },
+  }),
+});
+
+const CreateProfileInputType = new GraphQLInputObjectType({
+  name: 'CreateProfileInput',
+  fields: () => ({
+    isMale: { type: new GraphQLNonNull(GraphQLBoolean) },
+    yearOfBirth: { type: new GraphQLNonNull(GraphQLInt) },
+    userId: { type: new GraphQLNonNull(UUIDType) },
+    memberTypeId: { type: new GraphQLNonNull(MemberTypeId) },
+  }),
+});
+
+export const Types = [
+  User,
+  Post,
+  MemberType,
+  Profile,
+  CreateUserInputType,
+  CreatePostInputType,
+  CreateProfileInputType,
+];
 
 export const QueryType = new GraphQLObjectType({
   name: 'RootQueryType',
@@ -119,6 +155,38 @@ export const QueryType = new GraphQLObjectType({
       },
       resolve: (_parent, args, context) =>
         getDataResolver(ResolverActions.GET_PROFILE_BY_ID, context, args),
+    },
+  },
+});
+
+export const MutationType = new GraphQLObjectType({
+  name: 'RootMutationType',
+  fields: {
+    createUser: {
+      type: User as GraphQLObjectType<unknown, unknown>,
+      args: {
+        dto: { type: new GraphQLNonNull(CreateUserInputType) },
+      },
+      resolve: (_parent, args, context) =>
+        getDataResolver(ResolverActions.CREATE_USER, context, args),
+    },
+
+    createPost: {
+      type: Post,
+      args: {
+        dto: { type: new GraphQLNonNull(CreatePostInputType) },
+      },
+      resolve: (_parent, args, context) =>
+        getDataResolver(ResolverActions.CREATE_POST, context, args),
+    },
+
+    createProfile: {
+      type: Profile,
+      args: {
+        dto: { type: new GraphQLNonNull(CreateProfileInputType) },
+      },
+      resolve: (_parent, args, context) =>
+        getDataResolver(ResolverActions.CREATE_PROFILE, context, args),
     },
   },
 });

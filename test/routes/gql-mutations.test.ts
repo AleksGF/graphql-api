@@ -5,209 +5,238 @@ import {
   createPost,
   createProfile,
   createUser,
-  getPost,
-  getProfile,
-  getUser,
+  getMemberTypes,
+  getPosts,
+  getProfiles,
+  getUsers,
   gqlQuery,
   subscribeTo,
-  subscribedToUser,
 } from '../utils/requests.js';
 import { MemberTypeId } from '../../src/routes/member-types/schemas.js';
-import {
-  genCreatePostDto,
-  genCreateProfileDto,
-  genCreateUserDto,
-} from '../utils/fake.js';
 
-await test('gql-mutations', async (t) => {
+await test('gql-queries', async (t) => {
   const app = await build(t);
 
-  await t.test('Create resources.', async (t) => {
+  await t.test('Get all resources.', async (t) => {
+    const { body: user1 } = await createUser(app);
+    await createPost(app, user1.id);
+    await createProfile(app, user1.id, MemberTypeId.BASIC);
+
+    const { body: memberTypes } = await getMemberTypes(app);
+    const { body: posts } = await getPosts(app);
+    const { body: users } = await getUsers(app);
+    const { body: profiles } = await getProfiles(app);
+
+    const {
+      body: { data },
+    } = await gqlQuery(app, {
+      query: `query {
+        memberTypes {
+            id
+            discount
+            postsLimitPerMonth
+        }
+        posts {
+            id
+            title
+            content
+        }
+        users {
+            id
+            name
+            balance
+        }
+        profiles {
+            id
+            isMale
+            yearOfBirth
+        }
+    }`,
+    });
+
+    t.ok(data.memberTypes.length === memberTypes.length);
+    t.ok(data.posts.length === posts.length);
+    t.ok(data.users.length === users.length);
+    t.ok(data.profiles.length === profiles.length);
+  });
+
+  await t.test('Get all resources by their id.', async (t) => {
+    const { body: user1 } = await createUser(app);
+    const { body: post1 } = await createPost(app, user1.id);
+    const { body: profile1 } = await createProfile(app, user1.id, MemberTypeId.BASIC);
+
+    const {
+      body: { data },
+    } = await gqlQuery(app, {
+      query: `query ($userId: UUID!, $profileId: UUID!, $memberTypeId: MemberTypeId!, $postId: UUID!) {
+        memberType(id: $memberTypeId) {
+            id
+            discount
+            postsLimitPerMonth
+        }
+        post(id: $postId) {
+            id
+            title
+            content
+        }
+        user(id: $userId) {
+            id
+            name
+            balance
+        }
+        profile(id: $profileId) {
+            id
+            isMale
+            yearOfBirth
+        }
+    }`,
+      variables: {
+        userId: user1.id,
+        profileId: profile1.id,
+        memberTypeId: MemberTypeId.BASIC,
+        postId: post1.id,
+      },
+    });
+
+    t.ok(data.memberType.id === MemberTypeId.BASIC);
+    t.ok(data.post.id === post1.id);
+    t.ok(data.user.id === user1.id);
+    t.ok(data.profile.id === profile1.id);
+  });
+
+  await t.test('Get non-existent resources by their id.', async (t) => {
     const { body: user1 } = await createUser(app);
 
     const {
       body: { data, errors },
     } = await gqlQuery(app, {
-      query: `mutation ($postDto: CreatePostInput!, $userDto: CreateUserInput!, $profileDto: CreateProfileInput!) {
-        createPost(dto: $postDto) {
+      query: `query ($nullUserId: UUID!, $userWithNullProfileId: UUID!, $profileId: UUID!, $postId: UUID!) {
+        user(id: $nullUserId) {
             id
         }
-        createUser(dto: $userDto) {
+        post(id: $postId) {
             id
         }
-        createProfile(dto: $profileDto) {
+        profile(id: $profileId) {
             id
+        }
+        userWithNullProfile: user(id: $userWithNullProfileId) {
+            id
+            profile {
+              id
+            }
         }
     }`,
       variables: {
-        userDto: genCreateUserDto(),
-        postDto: genCreatePostDto(user1.id),
-        profileDto: genCreateProfileDto(user1.id, MemberTypeId.BUSINESS),
+        userWithNullProfileId: user1.id,
+        nullUserId: randomUUID(),
+        profileId: randomUUID(),
+        postId: randomUUID(),
       },
     });
-
-    const { body: foundCreatedPost } = await getPost(app, data.createPost.id);
-    const { body: foundCreatedUser } = await getUser(app, data.createUser.id);
-    const { body: foundCreatedProfile } = await getProfile(app, data.createProfile.id);
 
     t.ok(!errors);
-    t.ok(foundCreatedPost);
-    t.ok(foundCreatedUser);
-    t.ok(foundCreatedProfile);
+    t.ok(data.post === null);
+    t.ok(data.profile === null);
+    t.ok(data.user === null);
+    t.ok(data.userWithNullProfile.profile === null);
   });
 
-  await t.test('Create profile => fail; invalid dto.yearOfBirth.', async (t) => {
-    const {
-      body: { errors },
-    } = await gqlQuery(app, {
-      query: `mutation ($profileDto: CreateProfileInput!) {
-        createProfile(dto: $profileDto) {
-            id
-        }
-    }`,
-      variables: {
-        profileDto: {
-          ...genCreateProfileDto(randomUUID(), MemberTypeId.BUSINESS),
-          yearOfBirth: 123.321,
-        },
-      },
-    });
-
-    t.ok(errors.length === 1);
-    const message = errors[0].message as string;
-    t.ok(message.includes(`Int cannot represent non-integer value: 123.321`));
-  });
-
-  await t.test('Delete resources by id.', async (t) => {
+  await t.test('Get user/users with his/their posts, profile, memberType.', async (t) => {
     const { body: user1 } = await createUser(app);
     const { body: post1 } = await createPost(app, user1.id);
-    const { body: profile1 } = await createProfile(app, user1.id, MemberTypeId.BUSINESS);
+    const { body: profile1 } = await createProfile(app, user1.id, MemberTypeId.BASIC);
 
     const {
-      body: { errors },
+      body: { data: dataUser },
     } = await gqlQuery(app, {
-      // https://graphql.org/learn/queries/#multiple-fields-in-mutations
-      query: `mutation ($userId: UUID!, $profileId: UUID!, $postId: UUID!) {
-        deletePost(id: $postId)
-        deleteProfile(id: $profileId)
-        deleteUser(id: $userId)
-    }`,
+      query: `query ($userId: UUID!) {
+          user(id: $userId) {
+              id
+              profile {
+                  id
+                  memberType {
+                      id
+                  }
+              }
+              posts {
+                  id
+              }
+          }
+      }`,
       variables: {
-        postId: post1.id,
-        profileId: profile1.id,
         userId: user1.id,
       },
     });
-
-    const { body: foundDeletedPost } = await getPost(app, post1.id);
-    const { body: foundCreatedUser } = await getUser(app, user1.id);
-    const { body: foundCreatedProfile } = await getProfile(app, profile1.id);
-
-    t.ok(!errors);
-    t.ok(foundDeletedPost === null);
-    t.ok(foundCreatedUser === null);
-    t.ok(foundCreatedProfile === null);
-  });
-
-  await t.test('Change resources by id.', async (t) => {
-    const { body: user1 } = await createUser(app);
-    const { body: post1 } = await createPost(app, user1.id);
-    const { body: profile1 } = await createProfile(app, user1.id, MemberTypeId.BUSINESS);
-
-    const changedName = genCreateUserDto().name;
-    const changedTitle = genCreatePostDto('').title;
-    const changedIsMale = !profile1.isMale;
-
     const {
-      body: { data, errors },
+      body: { data: dataUsers },
     } = await gqlQuery(app, {
-      query: `
-      mutation ($postId: UUID!, $postDto: ChangePostInput!, $profileId: UUID!, $profileDto: ChangeProfileInput!, $userId: UUID!, $userDto: ChangeUserInput!) {
-        changePost(id: $postId, dto: $postDto) {
-            id
-        }
-        changeProfile(id: $profileId, dto: $profileDto) {
-            id
-        }
-        changeUser(id: $userId, dto: $userDto) {
-            id
-        }
-      }
-      `,
-      variables: {
-        postId: post1.id,
-        postDto: { title: changedTitle },
-        profileId: profile1.id,
-        profileDto: { isMale: changedIsMale },
-        userId: user1.id,
-        userDto: { name: changedName },
-      },
+      query: `query {
+          users {
+              id
+              profile {
+                  id
+                  memberType {
+                      id
+                  }
+              }
+              posts {
+                  id
+              }
+          }
+      }`,
     });
 
-    const { body: foundChangedPost } = await getPost(app, data.changePost.id);
-    const { body: foundChangedUser } = await getUser(app, data.changeUser.id);
-    const { body: foundChangedProfile } = await getProfile(app, data.changeProfile.id);
+    t.ok(dataUser.user.id === user1.id);
+    t.ok(dataUser.user.profile.id === profile1.id);
+    t.ok(dataUser.user.profile.memberType?.id === MemberTypeId.BASIC);
+    t.ok(dataUser.user.posts[0].id === post1.id);
 
-    t.ok(!errors);
-    t.ok(foundChangedPost.title === changedTitle);
-    t.ok(foundChangedUser.name === changedName);
-    t.ok(foundChangedProfile.isMale === changedIsMale);
+    const foundUser1 = dataUsers.users.find((user) => user.id === user1.id);
+    t.same(foundUser1, dataUser.user);
   });
 
-  await t.test('Change profile => fail; invalid dto.userId.', async (t) => {
-    const {
-      body: { errors },
-    } = await gqlQuery(app, {
-      query: `mutation ($id: UUID!, $dto: ChangeProfileInput!) {
-        changeProfile(id: $id, dto: $dto) {
-            id
-        }
-    }`,
-      variables: {
-        id: randomUUID(),
-        dto: {
-          userId: randomUUID(),
-        },
-      },
-    });
-
-    t.ok(errors.length === 1);
-    const message = errors[0].message as string;
-    t.ok(
-      message.includes(`Field \"userId\" is not defined by type \"ChangeProfileInput\"`),
-    );
-  });
-
-  await t.test('Subs mutations.', async (t) => {
+  await t.test(`Get user by id with his subs.`, async (t) => {
     const { body: user1 } = await createUser(app);
     const { body: user2 } = await createUser(app);
     const { body: user3 } = await createUser(app);
-    const { body: user4 } = await createUser(app);
 
-    await subscribeTo(app, user3.id, user4.id);
+    await subscribeTo(app, user1.id, user2.id);
+    await subscribeTo(app, user3.id, user1.id);
 
     const {
-      body: { errors },
+      body: { data: data },
     } = await gqlQuery(app, {
-      query: `mutation ($userId1: UUID!, $authorId1: UUID!, $userId2: UUID!, $authorId2: UUID!) {
-        subscribeTo(userId: $userId1, authorId: $authorId1) {
-            id
-        }
-        unsubscribeFrom(userId: $userId2, authorId: $authorId2)
-    }`,
+      query: `query ($userId: UUID!) {
+          user(id: $userId) {
+              id
+              userSubscribedTo {
+                  id
+                  name
+                  subscribedToUser {
+                      id
+                  }
+              }
+              subscribedToUser {
+                  id
+                  name
+                  userSubscribedTo {
+                      id
+                  }
+              }
+          }
+      }`,
       variables: {
-        userId1: user1.id,
-        authorId1: user2.id,
-        userId2: user3.id,
-        authorId2: user4.id,
+        userId: user1.id,
       },
     });
 
-    const { body: subscribedToUser2 } = await subscribedToUser(app, user2.id);
-    const { body: subscribedToUser4 } = await subscribedToUser(app, user4.id);
+    t.ok(data.user.userSubscribedTo[0].id === user2.id);
+    t.ok(data.user.userSubscribedTo[0].name === user2.name);
+    t.ok(data.user.userSubscribedTo[0].subscribedToUser[0].id === user1.id);
 
-    t.ok(!errors);
-    t.ok(subscribedToUser2[0].id === user1.id);
-    t.ok(subscribedToUser4.length === 0);
+    t.ok(data.user.subscribedToUser[0].id === user3.id);
+    t.ok(data.user.subscribedToUser[0].name === user3.name);
+    t.ok(data.user.subscribedToUser[0].userSubscribedTo[0].id === user1.id);
   });
 });

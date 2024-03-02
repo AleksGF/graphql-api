@@ -18,6 +18,24 @@ type IdArgs = {
   id: string;
 };
 
+type NewUserDTO = {
+  name: string;
+  balance: number;
+};
+
+type NewPostDTO = {
+  title: string;
+  content: string;
+  authorId: string;
+};
+
+type NewProfileDTO = {
+  isMale: boolean;
+  yearOfBirth: number;
+  memberTypeId: string;
+  userId: string;
+};
+
 type MemberTypes = {
   id: string;
   discount: number;
@@ -66,6 +84,9 @@ export enum ResolverActions {
   GET_PROFILE_BY_ID = 'getProfileById',
   GET_ALL_MEMBER_TYPES = 'getAllMemberTypes',
   GET_MEMBER_TYPE_BY_ID = 'getMemberTypeById',
+  CREATE_USER = 'createUser',
+  CREATE_POST = 'createPost',
+  CREATE_PROFILE = 'createProfile',
 }
 
 const getUserInclude = () => ({
@@ -220,6 +241,30 @@ const userByIdResolver = async (args: unknown, requestInfo?: object) => {
   return await addSubsToUser(user, requestInfo);
 };
 
+const createUserResolver = async (
+  prisma: Prisma,
+  args: unknown,
+  requestInfo?: object,
+) => {
+  const { dto } = args as { dto: NewUserDTO };
+
+  const newUser = await prisma.user.create({
+    data: {
+      name: dto.name,
+      balance: dto.balance,
+    },
+    include: getUserInclude(),
+  });
+
+  userDataLoader.prime(newUser.id, newUser);
+
+  const user = (await userDataLoader.load(newUser.id)) as User;
+
+  if (!checkAreSubsNeeded(requestInfo)) return user;
+
+  return await addSubsToUser(user, requestInfo);
+};
+
 const postsResolver = async (prisma: Prisma) => {
   const posts = await prisma.post.findMany();
 
@@ -236,6 +281,22 @@ const postByIdResolver = async (args: unknown) => {
   return await postDataLoader.load(id);
 };
 
+const createPostResolver = async (prisma: Prisma, args: unknown) => {
+  const { dto } = args as { dto: NewPostDTO };
+
+  const newPost = await prisma.post.create({
+    data: {
+      title: dto.title,
+      content: dto.content,
+      authorId: dto.authorId,
+    },
+  });
+
+  postDataLoader.prime(newPost.id, newPost);
+
+  return await postDataLoader.load(newPost.id);
+};
+
 const profilesResolver = async (prisma: Prisma) => {
   const profiles = await prisma.profile.findMany();
 
@@ -250,6 +311,23 @@ const profileByIdResolver = async (args: unknown) => {
   const { id } = args as IdArgs;
 
   return await profileDataLoader.load(id);
+};
+
+const createProfileResolver = async (prisma: Prisma, args: unknown) => {
+  const { dto } = args as { dto: NewProfileDTO };
+
+  const newProfile = await prisma.profile.create({
+    data: {
+      isMale: dto.isMale,
+      yearOfBirth: dto.yearOfBirth,
+      memberTypeId: dto.memberTypeId,
+      userId: dto.userId,
+    },
+  });
+
+  profileDataLoader.prime(newProfile.id, newProfile);
+
+  return await profileDataLoader.load(newProfile.id);
 };
 
 const memberTypesResolver = async (prisma: Prisma) => {
@@ -316,5 +394,14 @@ export const getDataResolver = (
 
     case ResolverActions.GET_MEMBER_TYPE_BY_ID:
       return memberTypeByIdResolver(prisma, args);
+
+    case ResolverActions.CREATE_USER:
+      return createUserResolver(prisma, args, userRequestInfo);
+
+    case ResolverActions.CREATE_POST:
+      return createPostResolver(prisma, args);
+
+    case ResolverActions.CREATE_PROFILE:
+      return createProfileResolver(prisma, args);
   }
 };
