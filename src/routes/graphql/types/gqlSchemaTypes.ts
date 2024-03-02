@@ -66,12 +66,28 @@ const CreateUserInputType = new GraphQLInputObjectType({
   }),
 });
 
+const ChangeUserInputType = new GraphQLInputObjectType({
+  name: 'ChangeUserInput',
+  fields: () => ({
+    name: { type: GraphQLString },
+    balance: { type: GraphQLFloat },
+  }),
+});
+
 const CreatePostInputType = new GraphQLInputObjectType({
   name: 'CreatePostInput',
   fields: () => ({
     title: { type: new GraphQLNonNull(GraphQLString) },
     content: { type: new GraphQLNonNull(GraphQLString) },
     authorId: { type: new GraphQLNonNull(UUIDType) },
+  }),
+});
+
+const ChangePostInputType = new GraphQLInputObjectType({
+  name: 'ChangePostInput',
+  fields: () => ({
+    title: { type: GraphQLString },
+    content: { type: GraphQLString },
   }),
 });
 
@@ -85,6 +101,15 @@ const CreateProfileInputType = new GraphQLInputObjectType({
   }),
 });
 
+const ChangeProfileInputType = new GraphQLInputObjectType({
+  name: 'ChangeProfileInput',
+  fields: () => ({
+    isMale: { type: GraphQLBoolean },
+    yearOfBirth: { type: GraphQLInt },
+    memberTypeId: { type: MemberTypeId },
+  }),
+});
+
 export const Types = [
   User,
   Post,
@@ -93,6 +118,9 @@ export const Types = [
   CreateUserInputType,
   CreatePostInputType,
   CreateProfileInputType,
+  ChangeUserInputType,
+  ChangePostInputType,
+  ChangeProfileInputType,
 ];
 
 export const QueryType = new GraphQLObjectType({
@@ -214,6 +242,36 @@ export const MutationType = new GraphQLObjectType({
       },
       resolve: (_parent, args, context) =>
         getDataResolver(ResolverActions.DELETE_PROFILE, context, args),
+    },
+
+    changeUser: {
+      type: User as GraphQLObjectType<unknown, unknown>,
+      args: {
+        id: { type: new GraphQLNonNull(UUIDType) },
+        dto: { type: new GraphQLNonNull(ChangeUserInputType) },
+      },
+      resolve: (_parent, args, context) =>
+        getDataResolver(ResolverActions.CHANGE_USER, context, args),
+    },
+
+    changePost: {
+      type: Post,
+      args: {
+        id: { type: new GraphQLNonNull(UUIDType) },
+        dto: { type: new GraphQLNonNull(ChangePostInputType) },
+      },
+      resolve: (_parent, args, context) =>
+        getDataResolver(ResolverActions.CHANGE_POST, context, args),
+    },
+
+    changeProfile: {
+      type: Profile,
+      args: {
+        id: { type: new GraphQLNonNull(UUIDType) },
+        dto: { type: new GraphQLNonNull(ChangeProfileInputType) },
+      },
+      resolve: (_parent, args, context) =>
+        getDataResolver(ResolverActions.CHANGE_PROFILE, context, args),
     },
   },
 });
